@@ -90,7 +90,8 @@ def parse_arguments():
 
     # set default mode to stories
     if not args.learn and not args.stories:
-        args.stories = True
+        #args.stories = True
+        args.learn = True
 
     return args
 
@@ -298,7 +299,64 @@ def challenge_translate():
                 for tap_token in tap_tokens:
                     if tap_token.get_attribute("disabled") != None:
                         continue
-                    if tap_token.text.lower() == word:
+                    token_text = tap_token.text.lower()
+                    if token_text == word:
+                        tap_token.click()
+                        break
+                    elif word.startswith(token_text):
+                        tap_token.click()
+                        word = word.replace(token_text, "")
+
+        else:
+            input_field = driver.find_element_by_xpath('//textarea[@data-test="challenge-translate-input"]')
+            input_field.send_keys(dictionary[sentence])
+            input_field.send_keys(Keys.RETURN)
+
+    else:
+        skip = driver.find_element_by_xpath('//button[@data-test="player-skip"]')
+        skip.click()
+        solution = driver.find_element_by_xpath('//div[@class="_1UqAr _1sqiF"]').text
+        solution = solution.replace(";", "").replace("¿", "").replace("¡", "")
+        dictionary[sentence] = solution
+        # print(sentence, '--->', dictionary[sentence])
+
+
+def challenge_translate_character():
+    # static variable for choosing method of splitting tap tokens with apostrophe sign
+    if "apostrophe_counter" not in challenge_translate.__dict__:
+        challenge_translate.apostrophe_counter = 0
+    # static variable for choosing method of splitting tap tokens with dash sign
+    if "dash_counter" not in challenge_translate.__dict__:
+        challenge_translate.dash_counter = 0
+
+    sentence = driver.find_element_by_xpath('//h1[@data-test="challenge-header"]').text
+    sentence += " (t)"
+    if sentence in dictionary:
+        tap_tokens = driver.find_elements_by_xpath('//div[@data-test="challenge-choice-card"]')
+        # check if the challenge is tap tokens
+        if len(tap_tokens) > 0:
+            # get solution without dot at the end
+            # remove commas, dots, marks and change string to lowercase
+            solution = dictionary[sentence].replace(".", "").replace(",", "").replace("!", "").replace("?", "").lower()
+
+            if challenge_translate.apostrophe_counter % 2 == 0:
+                solution = solution.replace("'", " '")
+
+            if challenge_translate.dash_counter < 2:
+                solution = solution.replace("-", " ")
+
+            challenge_translate.apostrophe_counter = (challenge_translate.apostrophe_counter + 1) % 2
+            challenge_translate.dash_counter = (challenge_translate.dash_counter + 1) % 4
+
+            words = solution.split(" ")
+            
+
+            for word in words:
+                for tap_token in tap_tokens:
+                    if tap_token.get_attribute("disabled") != None:
+                        continue
+                    token_text = tap_token.text.lower().replace("\n1", "").replace("\n2", "").replace("\n3", "").replace("\n4", "")
+                    if token_text == word:
                         tap_token.click()
                         break
         else:
@@ -557,6 +615,14 @@ def complete_skill(possible_skip_to_lesson=False):
             except WebDriverException:
                 pass
 
+            #Match Challenge (Working)
+            try:
+                challenge = driver.find_element_by_xpath('//div[@data-test="challenge challenge-characterMatch"]')
+                challenge = driver.find_elements_by_xpath('//button[@data-test="challenge-tap-token"]')
+                task_tokens(challenge)
+            except WebDriverException:
+                pass
+
             try:
                 challenge = driver.find_element_by_xpath('//div[@data-test="challenge challenge-dialogue"]')
                 challenge_dialogue_readcomp(True)
@@ -585,6 +651,21 @@ def complete_skill(possible_skip_to_lesson=False):
             except WebDriverException:
                 pass
 
+            #Translating 1 character
+            try:
+                challenge = driver.find_element_by_xpath('//div[@data-test="challenge challenge-characterSelect"]')
+                challenge_translate_character()
+            except WebDriverException:
+                pass
+            
+            #Skip if challenge isn't found or isnt't implemented
+            try:
+                skip = driver.find_element_by_xpath('//button[@data-test="player-skip"]')
+                #skip.click()
+                #break
+            except WebDriverException:
+                pass
+
             try:
                 next = driver.find_element_by_xpath('//button[@data-test="player-next"]')
                 next.click()
@@ -596,6 +677,14 @@ def complete_skill(possible_skip_to_lesson=False):
             try:
                 blank_item = driver.find_element_by_xpath('//div[@class="_2fX2D"]')
                 skill_completed = True
+                break
+            except WebDriverException:
+                pass
+
+            #Checks if invite notifications shows up
+            try:
+                no_thanks = driver.find_element_by_xpath('//button[@data-test="notification-drawer-no-thanks-button"]')
+                no_thanks.click()
                 break
             except WebDriverException:
                 pass
